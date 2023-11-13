@@ -1,0 +1,14 @@
+# Here you can define all your data sets by using simple YAML syntax.
+#
+# Documentation for this file format can be found in "The Data Catalog"
+# Link: https://docs.kedro.org/en/stable/data/data_catalog.html
+
+ratings:
+  type: pandas.CSVDataset
+  filepath: data/01_raw/ratings.csv
+  versioned: false
+
+movies:
+  type: pandas.CSVDataset
+  filepath: data/01_raw/movies.csv
+  versioned: false
