@@ -12,3 +12,44 @@ movies:
   type: pandas.CSVDataset
   filepath: data/01_raw/movies.csv
   versioned: false
+
+cleaned_movies:
+  type: pandas.CSVDataset
+  filepath: data/02_intermediate/movies.csv
+  versioned: false
+
+cleaned_ratings:
+  type: pandas.CSVDataset
+  filepath: data/02_intermediate/ratings.csv
+  versioned: false
+
+indexed_ratings:
+  type: pandas.CSVDataset
+  filepath: data/03_primary/ratings.csv
+  versioned: false
+
+movies_to_indices:
+  type: MemoryDataset
+
+indices_to_users:
+  type: MemoryDataset
+
+users_to_indices:
+  type: MemoryDataset
+
+normalized_ratings:
+  type: pandas.CSVDataset
+  filepath: data/05_model_input/ratings.csv
+  versioned: false
+
+trained_model:
+  type: tensorflow.TensorFlowModelDataset
+  filepath: data/06_models/moovier.h5
+  save_args:
+    save_format: h5
+  versioned: false
+
+recommended_movies:
+  type: pandas.CSVDataset
+  filepath: data/07_model_output/recommendations.csv
+  versioned: false
