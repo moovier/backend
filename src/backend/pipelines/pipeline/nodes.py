@@ -52,10 +52,10 @@ def train_model(ratings, training_split_ratio, embedding_size, learning_rate):
     )
 
 
-def recommend_movies(model, movies, ratings, movies_to_indices, indices_to_movies, users_to_indices, top_k):
+def recommend_movies(model, movies, ratings, movies_to_indices, indices_to_movies, users_to_indices, top_k, num_users):
     recommended_movies_for_all_users = []
 
-    for user_id in ratings['userId'].unique():
+    for user_id in ratings['userId'][:num_users]:
         movies_watched = ratings[ratings['userId'] == user_id]
 
         movies_not_watched = ~movies['movieId'].isin(movies_watched['movieId'].values)
@@ -137,7 +137,8 @@ recommend_movies_node = node(
         'movies_to_indices',
         'indices_to_movies',
         'users_to_indices',
-        'params:top_k'
+        'params:top_k',
+        'params:num_users'
     ],
     outputs='recommended_movies',
     name=recommend_movies.__name__
