@@ -1,6 +1,9 @@
 absl-py==2.0.0
+aiobotocore==2.7.0
+aiofiles==23.2.1
 aiohttp==3.9.0
 aiohttp-retry==2.8.3
+aioitertools==0.11.0
 aiosignal==1.3.1
 amqp==5.2.0
 annotated-types==0.6.0
@@ -24,6 +27,7 @@ billiard==4.2.0
 binaryornot==0.4.4
 black==23.11.0
 bleach==6.1.0
+botocore==1.31.64
 build==1.0.3
 cachetools==5.3.2
 celery==5.3.5
@@ -84,6 +88,8 @@ google-auth-oauthlib==1.1.0
 google-pasta==0.2.0
 googleapis-common-protos==1.61.0
 grandalf==0.8
+graphql-core==3.2.3
+greenlet==3.0.1
 grpcio==1.59.3
 gto==1.5.0
 h11==0.14.0
@@ -116,6 +122,7 @@ jupyterlab-pygments==0.2.2
 jupyterlab_server==2.25.2
 kedro==0.18.14
 kedro-datasets==1.8.0
+kedro-viz==6.7.0
 keras==2.15.0
 kiwisolver==1.4.5
 kombu==5.3.4
@@ -155,6 +162,7 @@ pexpect==4.8.0
 Pillow==10.1.0
 pip-tools==7.3.0
 platformdirs==3.11.0
+plotly==5.18.0
 pluggy==1.2.0
 prometheus-client==0.18.0
 prompt-toolkit==3.0.41
@@ -165,7 +173,7 @@ pure-eval==0.2.2
 pyasn1==0.5.0
 pyasn1-modules==0.3.0
 pycparser==2.21
-pydantic==2.5.1
+pydantic==1.10.13
 pydantic_core==2.14.3
 pydot==1.4.2
 PyDrive2==1.17.0
@@ -194,7 +202,9 @@ rpds-py==0.13.0
 rsa==4.9
 ruamel.yaml==0.18.5
 ruamel.yaml.clib==0.2.8
+s3fs==2023.10.0
 scmrepo==1.4.1
+secure==0.3.0
 semver==3.0.2
 Send2Trash==1.8.2
 shortuuid==1.0.11
@@ -203,10 +213,13 @@ six==1.16.0
 smmap==5.0.1
 sniffio==1.3.0
 soupsieve==2.5
+SQLAlchemy==2.0.23
 sqltrie==0.8.0
 stack-data==0.6.3
 starlette==0.27.0
+strawberry-graphql==0.215.0
 tabulate==0.9.0
+tenacity==8.2.3
 tensorboard==2.15.1
 tensorboard-data-server==0.7.2
 tensorflow==2.15.0
@@ -229,12 +242,13 @@ typing_extensions==4.8.0
 tzdata==2023.3
 uri-template==1.3.0
 uritemplate==4.1.1
-urllib3==2.1.0
-uvicorn==0.24.0.post1
+urllib3==2.0.7
+uvicorn==0.22.0
 uvloop==0.19.0
 vine==5.1.0
 voluptuous==0.14.1
 watchfiles==0.21.0
+watchgod==0.8.2
 wcwidth==0.2.10
 webcolors==1.13
 webencodings==0.5.1
