@@ -7,17 +7,11 @@ from .model import train_recommender
 
 def drop_year_and_translation(movies):
     def clean_title(title):
-        # Remove any data in parentheses (year/translation)
         title_clear = title.split(" (")[0]
-        # Split the title on commas
         parts = title_clear.split(", ")
-        # Swap parts if there's a comma
-        if len(parts) > 1:
-            return " ".join(parts[::-1])
-        return title_clear
+        return " ".join(parts[::-1]) if len(parts) > 1 else title_clear
 
     movies["title"] = movies["title"].apply(clean_title)
-
     return movies
 
 
@@ -57,7 +51,7 @@ def normalize_ratings(ratings):
     return ratings
 
 
-def train_model(ratings, training_split_ratio, embedding_size, learning_rate):
+def train_model(ratings, training_split_ratio, embedding_size, learning_rate, patience):
     return train_recommender(
         x=ratings[["user", "movie"]].values,
         y=ratings["rating"],
@@ -66,6 +60,7 @@ def train_model(ratings, training_split_ratio, embedding_size, learning_rate):
         embedding_size=embedding_size,
         learning_rate=learning_rate,
         train_split=int(training_split_ratio * ratings.shape[0]),
+        patience=patience,
     )
 
 
@@ -81,7 +76,7 @@ def recommend_movies(
 ):
     recommended_movies_for_all_users = []
 
-    for user_id in ratings["userId"][:num_users]:
+    for user_id in ratings["userId"].unique()[:num_users]:
         movies_watched = ratings[ratings["userId"] == user_id]
 
         movies_not_watched = ~movies["movieId"].isin(movies_watched["movieId"].values)
@@ -161,6 +156,7 @@ train_model_node = node(
         "params:training_split_ratio",
         "params:embedding_size",
         "params:learning_rate",
+        "params:patience",
     ],
     outputs="trained_model",
     name=train_model.__name__,
