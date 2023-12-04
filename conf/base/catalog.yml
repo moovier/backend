@@ -13,6 +13,11 @@ movies:
   filepath: data/01_raw/movies.csv
   versioned: false
 
+links:
+  type: pandas.CSVDataset
+  filepath: data/01_raw/links.csv
+  versioned: false
+
 cleaned_movies:
   type: pandas.CSVDataset
   filepath: data/02_intermediate/movies.csv
@@ -23,19 +28,20 @@ cleaned_ratings:
   filepath: data/02_intermediate/ratings.csv
   versioned: false
 
+cleaned_links:
+  type: pandas.CSVDataset
+  filepath: data/04_feature/links.csv
+  versioned: false
+
+movies_to_indices:  { type: MemoryDataset }
+movies_to_tmdb:     { type: MemoryDataset }
+indices_to_users:   { type: MemoryDataset }
+users_to_indices:   { type: MemoryDataset }
+
 indexed_ratings:
   type: pandas.CSVDataset
   filepath: data/03_primary/ratings.csv
   versioned: false
-
-movies_to_indices:
-  type: MemoryDataset
-
-indices_to_users:
-  type: MemoryDataset
-
-users_to_indices:
-  type: MemoryDataset
 
 normalized_ratings:
   type: pandas.CSVDataset

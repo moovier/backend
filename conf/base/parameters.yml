@@ -1,6 +1,6 @@
 training_split_ratio: 0.9
 learning_rate: 0.001
 embedding_size: 50
-num_users: 10
 patience: 10
 top_k: 10
+user_ids: [1, 263, 474, 580, 606, 610]

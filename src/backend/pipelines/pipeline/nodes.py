@@ -5,18 +5,14 @@ from kedro.pipeline import node
 from .model import train_recommender
 
 
-def drop_year_and_translation(movies):
-    def clean_title(title):
-        title_clear = title.split(" (")[0]
-        parts = title_clear.split(", ")
-        return " ".join(parts[::-1]) if len(parts) > 1 else title_clear
-
-    movies["title"] = movies["title"].apply(clean_title)
+def drop_genres_and_title(movies):
+    movies = movies.drop(columns="genres")
+    movies = movies.drop(columns="title")
     return movies
 
 
-def drop_genres(movies):
-    return movies.drop(columns="genres")
+def drop_imbd_column(links):
+    return links.drop(columns="imdbId")
 
 
 def drop_timestamp(ratings):
@@ -24,11 +20,13 @@ def drop_timestamp(ratings):
 
 
 def index_ratings(ratings):
-    def create_index_maps(x):
-        x = x.unique().tolist()
-        idx_map = dict(enumerate(x))
-        rev_map = dict(map(reversed, idx_map.items()))
-        return idx_map, rev_map
+    def create_index_maps(data_column):
+        unique_values = data_column.unique().tolist()
+
+        index_to_value_map = dict(enumerate(unique_values))
+        value_to_index_map = dict(map(reversed, index_to_value_map.items()))
+
+        return index_to_value_map, value_to_index_map
 
     _, users_to_indices = create_index_maps(ratings.userId)
     indices_to_movies, movies_to_indices = create_index_maps(ratings.movieId)
@@ -38,6 +36,10 @@ def index_ratings(ratings):
     ratings["rating"] = ratings.rating.values.astype(np.float32)
 
     return ratings, movies_to_indices, indices_to_movies, users_to_indices
+
+
+def create_tmdb_mapping(links):
+    return dict(zip(links["movieId"], links["tmdbId"]))
 
 
 def normalize_ratings(ratings):
@@ -67,16 +69,16 @@ def train_model(ratings, training_split_ratio, embedding_size, learning_rate, pa
 def recommend_movies(
     model,
     movies,
+    movies_to_tmdb,
     ratings,
     movies_to_indices,
     indices_to_movies,
     users_to_indices,
     top_k,
-    num_users,
+    user_ids
 ):
     recommended_movies_for_all_users = []
-
-    for user_id in ratings["userId"].unique()[:num_users]:
+    for user_id in user_ids:
         movies_watched = ratings[ratings["userId"] == user_id]
 
         movies_not_watched = ~movies["movieId"].isin(movies_watched["movieId"].values)
@@ -93,6 +95,8 @@ def recommend_movies(
         inputs = np.hstack(inputs)
 
         ratings_pred = model.predict(inputs)
+        metrics = model.evaluate(x=inputs, y=ratings_pred, return_dict=True)
+
         ratings_pred = ratings_pred.flatten()
         ratings_sorted_indices = ratings_pred.argsort()[-top_k:][::-1]
 
@@ -100,27 +104,34 @@ def recommend_movies(
             indices_to_movies.get(movies_not_watched[rating][0])
             for rating in ratings_sorted_indices
         ]
-        recommended_movies = movies[movies["movieId"].isin(recommended_movies)]["title"]
 
-        recommended_movies_for_all_users.append(
-            {"userId": user_id, "recommendations": "|".join(recommended_movies)}
-        )
+        recommended_movies = movies[movies["movieId"].isin(recommended_movies)]["movieId"]
+        recommended_movies = [movies_to_tmdb.get(rec) for rec in recommended_movies]
+        recommended_movies = [str(int(rec)) for rec in recommended_movies]
 
+        column = {
+            "user": user_id,
+            "recommendations": ",".join(recommended_movies),
+            "binary_crossentropy": metrics.get('binary_crossentropy'),
+            "loss": metrics.get('loss')
+        }
+
+        recommended_movies_for_all_users.append(column)
     return pd.DataFrame(recommended_movies_for_all_users)
 
 
-drop_year_and_translation_node = node(
-    func=drop_year_and_translation,
+drop_genres_and_title_node = node(
+    func=drop_genres_and_title,
     inputs="movies",
-    outputs="cleaned_title",
-    name=drop_year_and_translation.__name__,
+    outputs="cleaned_movies",
+    name=drop_genres_and_title.__name__,
 )
 
-drop_genres_node = node(
-    func=drop_genres,
-    inputs="cleaned_title",
-    outputs="cleaned_movies",
-    name=drop_genres.__name__,
+drop_imdb_column_node = node(
+    func=drop_imbd_column,
+    inputs="links",
+    outputs="cleaned_links",
+    name=drop_imbd_column.__name__,
 )
 
 drop_timestamp_node = node(
@@ -128,6 +139,13 @@ drop_timestamp_node = node(
     inputs="ratings",
     outputs="cleaned_ratings",
     name=drop_timestamp.__name__,
+)
+
+create_tmdb_mapping_node = node(
+    func=create_tmdb_mapping,
+    inputs="cleaned_links",
+    outputs="movies_to_tmdb",
+    name=create_tmdb_mapping.__name__,
 )
 
 index_ratings_node = node(
@@ -167,12 +185,13 @@ recommend_movies_node = node(
     inputs=[
         "trained_model",
         "cleaned_movies",
+        "movies_to_tmdb",
         "normalized_ratings",
         "movies_to_indices",
         "indices_to_movies",
         "users_to_indices",
         "params:top_k",
-        "params:num_users",
+        "params:user_ids"
     ],
     outputs="recommended_movies",
     name=recommend_movies.__name__,
