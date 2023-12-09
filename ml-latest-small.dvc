@@ -3,4 +3,4 @@ outs:
   size: 3303135
   nfiles: 5
   hash: md5
-  path: ml-latest-small
+  path: data/01_raw
