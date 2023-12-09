@@ -1,3 +1,5 @@
+import pathlib
+
 from typing import Union
 
 from fastapi import FastAPI
@@ -19,11 +21,9 @@ app = FastAPI()
 #   # body needs user, movie, rating - validate user make sure it's within in the range as in data dir
 #   # save the new model in models dir with new name so that 
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
 
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: Union[str, None] = None):
-    return {"item_id": item_id, "q": q}
+@app.get("/models")
+def read_models():
+    clean_name = lambda n: n.name.removesuffix(".h5")
+    models = pathlib.Path("../models/").glob("*.h5")
+    return list(map(clean_name, models))
