@@ -71,10 +71,32 @@ def predict(
         from_inputs={"trained_model": model, "params:user_ids": user_ids, "params:top_k": top_k},
     )
 
-    catalog = context.catalog
-    return catalog.load("recommended_movies").to_dict()["recommendations"]
+    return  context.catalog.load("recommended_movies").to_dict()["recommendations"]
 
 
 @app.post("/train")
-def train():
-    return
+def train(
+    model_name: str,
+    training_split_ratio: float,
+    embedding_size: float, 
+    learning_rate: float,
+    patience: float,
+    session: KedroSession = Depends(get_session),
+    context: KedroContext = Depends(get_context),
+) -> str:
+    if not model_name.replace("_", "").isalnum():
+        raise HTTPException(status_code=400, detail="invalid model name")
+
+    session.run("pipeline", 
+        node_names=["train_model"],
+        from_inputs={
+            "params:training_split_ratio": training_split_ratio,
+            "params:embedding_size": embedding_size,
+            "params:learning_rate": learning_rate,
+            "params:patience": patience,
+        },
+    )
+
+    model = context.catalog.load("trained_model")
+    model.save(f"models/{model_name}.h5")
+    return model_name
