@@ -35,11 +35,20 @@ def index_ratings(ratings):
     ratings["movie"] = ratings.movieId.map(movies_to_indices)
     ratings["rating"] = ratings.rating.values.astype(np.float32)
 
-    return ratings, movies_to_indices, indices_to_movies, users_to_indices
+    return (
+        ratings, 
+        pd.DataFrame({"movies": movies_to_indices.keys(), "indices": movies_to_indices.values()}), 
+        pd.DataFrame({"indices": indices_to_movies.keys(), "movies": indices_to_movies.values()}), 
+        pd.DataFrame({"users": users_to_indices.keys(), "indices": users_to_indices.values()}),
+    )
 
 
 def create_tmdb_mapping(links):
-    return dict(zip(links["movieId"], links["tmdbId"]))
+    links = links.to_dict()
+    return pd.DataFrame({
+        "movieId": links["movieId"],
+        "tmdbId": links["tmdbId"], 
+    })
 
 
 def normalize_ratings(ratings):
@@ -77,6 +86,11 @@ def recommend_movies(
     top_k,
     user_ids
 ):
+    movies_to_tmdb = movies_to_tmdb.set_index("movieId")["tmdbId"].to_dict()
+    movies_to_indices = movies_to_indices.set_index("movies")["indices"].to_dict()
+    indices_to_movies = indices_to_movies.set_index("indices")["movies"].to_dict()
+    users_to_indices = users_to_indices.set_index("users")["indices"].to_dict()
+
     recommended_movies_for_all_users = []
     for user_id in user_ids:
         movies_watched = ratings[ratings["userId"] == user_id]
@@ -103,11 +117,12 @@ def recommend_movies(
         recommended_movies = [
             indices_to_movies.get(movies_not_watched[rating][0])
             for rating in ratings_sorted_indices
+            if movies_not_watched[rating][0] in indices_to_movies
         ]
 
         recommended_movies = movies[movies["movieId"].isin(recommended_movies)]["movieId"]
         recommended_movies = [movies_to_tmdb.get(rec) for rec in recommended_movies]
-        recommended_movies = [str(int(rec)) for rec in recommended_movies]
+        recommended_movies = [str(int(rec)) for rec in recommended_movies if rec]
 
         column = {
             "user": user_id,

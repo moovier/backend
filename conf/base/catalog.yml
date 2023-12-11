@@ -33,10 +33,25 @@ cleaned_links:
   filepath: data/04_feature/links.csv
   versioned: false
 
-movies_to_indices:  { type: MemoryDataset }
-movies_to_tmdb:     { type: MemoryDataset }
-indices_to_users:   { type: MemoryDataset }
-users_to_indices:   { type: MemoryDataset }
+movies_to_indices:
+  type: pandas.CSVDataset
+  filepath: data/04_feature/movies_to_indices.csv
+  versioned: false
+
+movies_to_tmdb:
+  type: pandas.CSVDataset
+  filepath: data/04_feature/movies_to_tmdb.csv
+  versioned: false
+
+indices_to_users:
+  type: pandas.CSVDataset
+  filepath: data/04_feature/indices_to_users.csv
+  versioned: false
+
+users_to_indices:
+  type: pandas.CSVDataset
+  filepath: data/04_feature/users_to_indices.csv
+  versioned: false
 
 indexed_ratings:
   type: pandas.CSVDataset
