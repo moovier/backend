@@ -48,6 +48,11 @@ indices_to_users:
   filepath: data/04_feature/indices_to_users.csv
   versioned: false
 
+indices_to_movies:
+  type: pandas.CSVDataset
+  filepath: data/04_feature/indices_to_movies.csv
+  versioned: false
+
 users_to_indices:
   type: pandas.CSVDataset
   filepath: data/04_feature/users_to_indices.csv

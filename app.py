@@ -1,7 +1,8 @@
 import pathlib
-from typing import Any, Iterable, Union
+import keras
+from typing import Any, Iterable, Union, Annotated
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from kedro.framework.context import KedroContext
 from kedro.framework.session import KedroSession
 from kedro.framework.startup import bootstrap_project
@@ -21,7 +22,6 @@ from kedro.framework.startup import bootstrap_project
 #   # call/invoke train_model_node kedro node which calls train_model function
 #   # body needs user, movie, rating - validate user make sure it's within in the range as in data dir
 #   # save the new model in models dir with new name so that 
-
 
 
 app = FastAPI(
@@ -46,18 +46,33 @@ def get_context(session: KedroSession = Depends(get_session)) -> Iterable[KedroC
 
 @app.get("/models")
 def list_models():
-    models = pathlib.Path("../models/").glob("*.h5")
+    models = pathlib.Path("models/").glob("*.h5")
     return [model.stem for model in models]
 
 
 @app.post("/predict")
 def predict(
+    model_name: str,
+    user_ids: list[int],
+    top_k: int,
     session: KedroSession = Depends(get_session),
     context: KedroContext = Depends(get_context),
 ) -> dict[str, Any]:
-    session.run("pipeline")
+    
+    models = pathlib.Path("models/").glob(f"{model_name}.h5")
+    if not models:
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    model_path = next(iter(models)).resolve()
+    model = keras.models.load_model(model_path)
+
+    session.run("pipeline", 
+        node_names=["recommend_movies"], 
+        from_inputs={"trained_model": model, "params:user_ids": user_ids, "params:top_k": top_k},
+    )
+
     catalog = context.catalog
-    return catalog.load("output")
+    return catalog.load("recommended_movies").to_dict()["recommendations"]
 
 
 @app.post("/train")
