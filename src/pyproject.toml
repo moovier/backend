@@ -31,3 +31,8 @@ docs = [
 
 [tool.setuptools.dynamic]
 dependencies = {file = "requirements.txt"}
+
+[tool.kedro]
+package_name = "moovier"
+project_name = "moovier"
+kedro_init_version = "0.18.14"
