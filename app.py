@@ -45,7 +45,7 @@ def get_context(session: KedroSession = Depends(get_session)) -> Iterable[KedroC
 
 
 @app.get("/models")
-def list_models():
+def list_models() -> list[str]:
     models = pathlib.Path("models/").glob("*.h5")
     return [model.stem for model in models]
 
@@ -57,34 +57,33 @@ def predict(
     top_k: int,
     session: KedroSession = Depends(get_session),
     context: KedroContext = Depends(get_context),
-) -> dict[str, Any]:
-    
-    models = pathlib.Path("models/").glob(f"{model_name}.h5")
-    if not models:
-        raise HTTPException(status_code=404, detail="Model not found")
+) -> dict[str, str]:
+    if model_name not in list_models():
+        raise HTTPException(status_code=404, detail="model not found")
 
-    model_path = next(iter(models)).resolve()
-    model = keras.models.load_model(model_path)
+    model = keras.models.load_model(f"models/{model_name}.h5")
 
     session.run("pipeline", 
         node_names=["recommend_movies"], 
         from_inputs={"trained_model": model, "params:user_ids": user_ids, "params:top_k": top_k},
     )
 
-    return  context.catalog.load("recommended_movies").to_dict()["recommendations"]
+    return context.catalog.load("recommended_movies").to_dict()["recommendations"]
 
 
 @app.post("/train")
 def train(
-    model_name: str,
+    old_model_name: str,
+    new_model_name: str,
     training_split_ratio: float,
     embedding_size: float, 
     learning_rate: float,
     patience: float,
+    ratings: list,
     session: KedroSession = Depends(get_session),
     context: KedroContext = Depends(get_context),
 ) -> str:
-    if not model_name.replace("_", "").isalnum():
+    if not old_model_name.replace("_", "").isalnum():
         raise HTTPException(status_code=400, detail="invalid model name")
 
     session.run("pipeline", 
@@ -98,5 +97,5 @@ def train(
     )
 
     model = context.catalog.load("trained_model")
-    model.save(f"models/{model_name}.h5")
-    return model_name
+    model.save(f"models/{new_model_name}.h5")
+    return new_model_name
