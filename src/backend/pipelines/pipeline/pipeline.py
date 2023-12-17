@@ -5,9 +5,10 @@ from .nodes import (
     index_ratings_node,
     create_tmdb_mapping_node,
     normalize_ratings_node,
-    train_model_node,
+    build_model_node,
     recommend_movies_node,
     drop_imdb_column_node,
+    train_model_node
 )
 
 actions = [
@@ -17,6 +18,7 @@ actions = [
     index_ratings_node,
     create_tmdb_mapping_node,
     normalize_ratings_node,
+    build_model_node,
     train_model_node,
     recommend_movies_node,
 ]

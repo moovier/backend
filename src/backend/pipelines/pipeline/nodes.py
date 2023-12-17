@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from kedro.pipeline import node
 
-from .model import train_recommender
+from .model import build_recommender, train_recommender
 
 
 def drop_genres_and_title(movies):
@@ -35,11 +35,20 @@ def index_ratings(ratings):
     ratings["movie"] = ratings.movieId.map(movies_to_indices)
     ratings["rating"] = ratings.rating.values.astype(np.float32)
 
-    return ratings, movies_to_indices, indices_to_movies, users_to_indices
+    return (
+        ratings, 
+        pd.DataFrame({"movies": movies_to_indices.keys(), "indices": movies_to_indices.values()}), 
+        pd.DataFrame({"indices": indices_to_movies.keys(), "movies": indices_to_movies.values()}), 
+        pd.DataFrame({"users": users_to_indices.keys(), "indices": users_to_indices.values()}),
+    )
 
 
 def create_tmdb_mapping(links):
-    return dict(zip(links["movieId"], links["tmdbId"]))
+    links = links.to_dict()
+    return pd.DataFrame({
+        "movieId": links["movieId"],
+        "tmdbId": links["tmdbId"], 
+    })
 
 
 def normalize_ratings(ratings):
@@ -53,16 +62,22 @@ def normalize_ratings(ratings):
     return ratings
 
 
-def train_model(ratings, training_split_ratio, embedding_size, learning_rate, patience):
-    return train_recommender(
-        x=ratings[["user", "movie"]].values,
-        y=ratings["rating"],
+def build_model(ratings, embedding_size, learning_rate):
+    return build_recommender(
         num_users=ratings["user"].nunique(),
         num_movies=ratings["movie"].nunique(),
         embedding_size=embedding_size,
         learning_rate=learning_rate,
-        train_split=int(training_split_ratio * ratings.shape[0]),
-        patience=patience,
+    )
+
+
+def train_model(model, ratings, validation_split, patience):
+    return train_recommender(
+        x=ratings[["user", "movie"]].values,
+        y=ratings["rating"],
+        model=model,
+        validation_split=validation_split,
+        patience=patience
     )
 
 
@@ -77,6 +92,11 @@ def recommend_movies(
     top_k,
     user_ids
 ):
+    movies_to_tmdb = movies_to_tmdb.set_index("movieId")["tmdbId"].to_dict()
+    movies_to_indices = movies_to_indices.set_index("movies")["indices"].to_dict()
+    indices_to_movies = indices_to_movies.set_index("indices")["movies"].to_dict()
+    users_to_indices = users_to_indices.set_index("users")["indices"].to_dict()
+
     recommended_movies_for_all_users = []
     for user_id in user_ids:
         movies_watched = ratings[ratings["userId"] == user_id]
@@ -103,11 +123,12 @@ def recommend_movies(
         recommended_movies = [
             indices_to_movies.get(movies_not_watched[rating][0])
             for rating in ratings_sorted_indices
+            if movies_not_watched[rating][0] in indices_to_movies
         ]
 
         recommended_movies = movies[movies["movieId"].isin(recommended_movies)]["movieId"]
         recommended_movies = [movies_to_tmdb.get(rec) for rec in recommended_movies]
-        recommended_movies = [str(int(rec)) for rec in recommended_movies]
+        recommended_movies = [str(int(rec)) for rec in recommended_movies if rec]
 
         column = {
             "user": user_id,
@@ -167,18 +188,29 @@ normalize_ratings_node = node(
     name=normalize_ratings.__name__,
 )
 
+build_model_node = node(
+    func=build_model,
+    inputs=[
+        "normalized_ratings",
+        "params:embedding_size",
+        "params:learning_rate",
+    ],
+    outputs="built_model",
+    name=build_model.__name__,
+)
+
 train_model_node = node(
     func=train_model,
     inputs=[
+        "built_model",
         "normalized_ratings",
-        "params:training_split_ratio",
-        "params:embedding_size",
-        "params:learning_rate",
-        "params:patience",
+        "params:validation_split",
+        "params:patience"
     ],
     outputs="trained_model",
     name=train_model.__name__,
 )
+
 
 recommend_movies_node = node(
     func=recommend_movies,
