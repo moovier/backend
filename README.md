@@ -1,86 +1,52 @@
-# Moovier: Movie Recommender System
+# Moovier - Movie Recommendation System
 
-## Introduction
-Moovier is a comprehensive movie recommendation system designed to offer personalized movie suggestions to users. This project is split into two main components: a robust backend API with a sophisticated machine learning model, and a user-friendly frontend interface.
-
-### Features
-
-- Personalized movie recommendations based on user preferences and interaction.
-- Advanced machine learning algorithms for accurate suggestions.
-- User-friendly API for seamless integration and interaction.
-- Intuitive frontend interface for an engaging user experience.
-
-## Getting Started
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
-
-### Prerequisites
-TODO: List all the tools or libraries that are necessary to run your project:
-- Example: Python 3.8+
-- Example: Node.js and React (for the frontend)
-
+Moovier is a novel movie recommendation system that uses [collaborative filtering](https://en.wikipedia.org/wiki/Collaborative_filtering) to offer personalized movie suggestions.
 
 ### Installation
-Step by step series of examples that tell you how to get a an environment running.
 
-1. Clone the backend repo:
+To use this application, an [TMDB API](https://www.themoviedb.org/) key is required to fetch information regarding the recommended movies.
+
    ```bash
-   git clone https://github.com/moovier/backend.git
+   git clone https://github.com/moovier/backend.git     # clone back-end
+   git clone https://github.com/moovier/frontend.git    # clone front-end
+  
+   python -m venv moovier                               # create moovier venv
+   source moovier/bin/activate                          # activate moovier
+
+   cd moovier/backend                                   # navigate to back-end
+   pip install -r src/requirements.txt                  # install dependencies
+   export TMDB_API_KEY=secret-key                       # set-up tmdb key
+   
+   cd ../frontend                                       # navigate to front-end
+   npm install                                          # install dependencies
    ```
-2. Clone the frontend repo:
-   ```bash
-   git clone https://github.com/moovier/frontend.git
-   ```
-3. Navigate to the project backend directory:
-    ```bash
-    cd moovier/backend
-    ```
-4. Create environment and install the required packages:
-    ```bash
-    conda create --name moovier python=3.8+
-    conda activate moovier
-    pip install -r src/requirements.txt
-    ```
-5. Navigate to the frontend directory:
-    ```bash
-    cd ../frontend
-    ```
-6.  
-    ```bash
-    npm install
-    ```
 
 ### Usage
 
-#### Starting the Backend Server
-```bash
-python path/to/magic.py
-```
+The project can be either run as a standalone [Kedro](https://kedro.org/) pipeline using `kedro run` or as
+a back-end API using `uvicorn app:app`. The application exposes the following endpoints:
 
-#### (Optional?)Run kedro pipeline
-You can run your Kedro project with:
+ - `/models` serves the names of pre-trained models that can be used for inference or fine-tuning.
+    ```bash
+   curl -X 'GET' \
+   'http://127.0.0.1:8000/models' \
+   -H 'accept: application/json'
+   ```
+ - `/predict` is used for returning movie recommendations. `model_name` specifies which of the pre-trained models to use for inference, while `top_k` selects how many movies to return for each `user_id` passed in the body.
+   ```bash
+   curl -X 'POST' \
+   'http://127.0.0.1:8000/predict?model_name=moovier_emb_25_trained_0&top_k=1' \
+   -H 'accept: application/json' \
+   -H 'Content-Type: application/json' \
+   -d '[1, 2, 3, 4]'
+   ```
 
-```bash
-cd backend
-kedro run --env=base
-```
+ - `/train` fine-tunes the selected `model_name` with a new batch of data. `validation_split` can be used to create a validation dataset for evaluation purposes; `patience` specifies at which point to activate the early stopping callback. By default, the `val_loss` is being monitored. `ratings` is the incoming batch of data on top of which the model is fine-tuned.
+   ```bash
+   curl -X 'POST' \
+   'http://127.0.0.1:8000/train?model_name=moovier_emb_25_trained_0&validation_split=0.1&patience=3' \
+   -H 'accept: application/json' \
+   -H 'Content-Type: multipart/form-data' \
+   -F 'ratings=string'
+   ```
 
-#### Starting the Fronend Application
-```bash
-cd frontend
-npm start
-```
-Verify the application is running by navigating to your server address in your preferred browser\
-http://localhost:3000/
-
-## Authors
-- **Leonardo Wajda** - *Initial work* - [YourUsername](https://github.com/leowajda)
-- **Azimjon Pulatov** - *Initial work* - [YourUsername](https://github.com/azimjohn)
-- **Lizaveta Babior** - *Initial work* - [YourUsername](https://github.com/Babior)
-
-## License
-This project is licensed under the XYZ License - see the [LICENSE.md](LICENSE.md) file for details.
-
-## Acknowledgments
-- Hat tip to anyone whose code was used (fronend guy)
-- Inspiration (netflix)
-- etc
