@@ -1,5 +1,12 @@
-import pathlib
+import os
 import keras
+import http3
+import asyncio
+from aiocache import cached
+from aiocache.serializers import PickleSerializer
+
+
+import pathlib
 from typing import Any, Iterable, Union, Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -22,6 +29,32 @@ from kedro.framework.startup import bootstrap_project
 #   # call/invoke train_model_node kedro node which calls train_model function
 #   # body needs user, movie, rating - validate user make sure it's within in the range as in data dir
 #   # save the new model in models dir with new name so that 
+
+
+class TMDBClient:
+    CACHE_TTL = 86400
+
+    def __init__(self, api_key: str) -> None:
+        self.api_key: str = api_key
+        self.client = http3.AsyncClient()
+    
+    @cached(ttl=CACHE_TTL, serializer=PickleSerializer())
+    async def fetch_movie(self, movie_id: str) -> dict:
+        url = "https://api.themoviedb.org/3/movie/{}?api_key={}".format(movie_id, self.api_key)
+        r = await self.client.get(url, verify=False)
+        return r.json()
+
+    async def fetch_movies(self, movie_ids: list[str]) -> list[dict]:
+        result = await asyncio.gather(
+            *[self.fetch_movie(id) for id in movie_ids], 
+            return_exceptions=True
+        )
+        return result
+
+    @classmethod
+    def get_instance(cls):
+        api_key = os.environ.get('TMDB_API_KEY')
+        yield cls(api_key)
 
 
 app = FastAPI(
@@ -51,13 +84,14 @@ def list_models() -> list[str]:
 
 
 @app.post("/predict")
-def predict(
+async def predict(
     model_name: str,
     user_ids: list[int],
     top_k: int,
     session: KedroSession = Depends(get_session),
     context: KedroContext = Depends(get_context),
-) -> dict[str, str]:
+    tmdb_client: TMDBClient = Depends(TMDBClient.get_instance),
+) -> dict[str, list[dict]]:
     if model_name not in list_models():
         raise HTTPException(status_code=404, detail="model not found")
 
@@ -68,7 +102,18 @@ def predict(
         from_inputs={"trained_model": model, "params:user_ids": user_ids, "params:top_k": top_k},
     )
 
-    return context.catalog.load("recommended_movies").to_dict()["recommendations"]
+    result = context.catalog.load("recommended_movies").to_dict()["recommendations"]
+    group = []
+    for val in result.values():
+        movie_ids = val.split(",")
+        group.append(tmdb_client.fetch_movies(movie_ids))
+
+    all_movies = await asyncio.gather(*group)
+
+    for key, movies in zip(result, all_movies):
+        result[key] = movies
+
+    return result
 
 
 @app.post("/train")
