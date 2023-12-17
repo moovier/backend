@@ -1,6 +1,7 @@
 import os
 import keras
 import http3
+import re
 import asyncio
 from aiocache import cached
 from aiocache.serializers import PickleSerializer
@@ -37,7 +38,7 @@ class TMDBClient:
     def __init__(self, api_key: str) -> None:
         self.api_key: str = api_key
         self.client = http3.AsyncClient()
-    
+
     @cached(ttl=CACHE_TTL, serializer=PickleSerializer())
     async def fetch_movie(self, movie_id: str) -> dict:
         url = "https://api.themoviedb.org/3/movie/{}?api_key={}".format(movie_id, self.api_key)
@@ -46,7 +47,7 @@ class TMDBClient:
 
     async def fetch_movies(self, movie_ids: list[str]) -> list[dict]:
         result = await asyncio.gather(
-            *[self.fetch_movie(id) for id in movie_ids], 
+            *[self.fetch_movie(id) for id in movie_ids],
             return_exceptions=True
         )
         return result
@@ -97,9 +98,13 @@ async def predict(
 
     model = keras.models.load_model(f"models/{model_name}.h5")
 
-    session.run("pipeline", 
-        node_names=["recommend_movies"], 
-        from_inputs={"trained_model": model, "params:user_ids": user_ids, "params:top_k": top_k},
+    session.run("pipeline",
+        node_names=["recommend_movies"],
+        from_inputs={
+            "trained_model": model,
+            "params:user_ids": user_ids,
+            "params:top_k": top_k
+        },
     )
 
     result = context.catalog.load("recommended_movies").to_dict()["recommendations"]
@@ -118,29 +123,38 @@ async def predict(
 
 @app.post("/train")
 def train(
-    old_model_name: str,
-    new_model_name: str,
-    training_split_ratio: float,
-    embedding_size: float, 
-    learning_rate: float,
+    model_name: str,
+    validation_split: float,
     patience: float,
     ratings: list,
     session: KedroSession = Depends(get_session),
     context: KedroContext = Depends(get_context),
 ) -> str:
-    if not old_model_name.replace("_", "").isalnum():
+    if not model_name.replace("_", "").isalnum():
         raise HTTPException(status_code=400, detail="invalid model name")
 
-    session.run("pipeline", 
+    session.run("pipeline",
         node_names=["train_model"],
         from_inputs={
-            "params:training_split_ratio": training_split_ratio,
-            "params:embedding_size": embedding_size,
-            "params:learning_rate": learning_rate,
+            "built_model": keras.models.load_model(f"models/{model_name}.h5", safe_mode=False),
+            "ratings": ratings,
+            "params:validation_split": validation_split,
             "params:patience": patience,
         },
     )
 
-    model = context.catalog.load("trained_model")
-    model.save(f"models/{new_model_name}.h5")
+    last_training = extract_last_training(model_name)
+    new_model_name = f"{extract_prefix(model_name)}_{last_training + 1}"
+
+    pathlib.Path(f"models/{model_name}.h5").unlink()
+    context.catalog.load("trained_model").save(f"models/{new_model_name}.h5")
     return new_model_name
+
+
+def extract_last_training(file_name):
+    match = re.search(r'_trained_(\d+)', file_name)
+    return int(match.group(1)) if match else 0
+
+
+def extract_prefix(file_name):
+    return re.sub(r'_\d+$', '', file_name)

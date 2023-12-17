@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from kedro.pipeline import node
 
-from .model import train_recommender
+from .model import build_recommender, train_recommender
 
 
 def drop_genres_and_title(movies):
@@ -62,16 +62,22 @@ def normalize_ratings(ratings):
     return ratings
 
 
-def train_model(ratings, training_split_ratio, embedding_size, learning_rate, patience):
-    return train_recommender(
-        x=ratings[["user", "movie"]].values,
-        y=ratings["rating"],
+def build_model(ratings, embedding_size, learning_rate):
+    return build_recommender(
         num_users=ratings["user"].nunique(),
         num_movies=ratings["movie"].nunique(),
         embedding_size=embedding_size,
         learning_rate=learning_rate,
-        train_split=int(training_split_ratio * ratings.shape[0]),
-        patience=patience,
+    )
+
+
+def train_model(model, ratings, validation_split, patience):
+    return train_recommender(
+        x=ratings[["user", "movie"]].values,
+        y=ratings["rating"],
+        model=model,
+        validation_split=validation_split,
+        patience=patience
     )
 
 
@@ -182,18 +188,29 @@ normalize_ratings_node = node(
     name=normalize_ratings.__name__,
 )
 
+build_model_node = node(
+    func=build_model,
+    inputs=[
+        "normalized_ratings",
+        "params:embedding_size",
+        "params:learning_rate",
+    ],
+    outputs="built_model",
+    name=build_model.__name__,
+)
+
 train_model_node = node(
     func=train_model,
     inputs=[
+        "built_model",
         "normalized_ratings",
-        "params:training_split_ratio",
-        "params:embedding_size",
-        "params:learning_rate",
-        "params:patience",
+        "params:validation_split",
+        "params:patience"
     ],
     outputs="trained_model",
     name=train_model.__name__,
 )
+
 
 recommend_movies_node = node(
     func=recommend_movies,

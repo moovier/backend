@@ -6,6 +6,13 @@ from keras.optimizers import Adam
 from keras import layers
 from kedro.config import ConfigLoader
 
+filepath = (
+    ConfigLoader(conf_source="./conf")
+    .get("catalog.yml")
+    .get("trained_model")
+    .get("filepath")
+)
+
 
 def build_recommender_model(num_users, num_movies, embedding_size):
 
@@ -38,19 +45,12 @@ def build_recommender_model(num_users, num_movies, embedding_size):
     return keras.Model(inputs=input_pair, outputs=output, name='recommender-net')
 
 
-def train_recommender(
-    x,
-    y,
+def build_recommender(
     num_users,
     num_movies,
     embedding_size,
     learning_rate,
-    train_split,
-    patience
 ):
-    x_train, x_val = x[:train_split], x[train_split:]
-    y_train, y_val = y[:train_split], y[train_split:]
-
     model = build_recommender_model(
         num_users=num_users,
         num_movies=num_movies,
@@ -63,35 +63,35 @@ def train_recommender(
         metrics=["binary_crossentropy"]
     )
 
-    filepath = (
-        ConfigLoader(conf_source="./conf")
-        .get("catalog.yml")
-        .get("trained_model")
-        .get("filepath")
+    return model
+
+
+def train_recommender(
+    x,
+    y,
+    model,
+    validation_split,
+    patience,
+):
+    early_stopping_callback = keras.callbacks.EarlyStopping(
+        monitor="val_loss", patience=patience,
     )
 
-    callbacks = [
-        keras.callbacks.EarlyStopping(
-            monitor="val_loss",
-            patience=patience,
-        ),
-        keras.callbacks.ModelCheckpoint(
-            filepath=filepath,
-            save_best_only=True,
-            monitor="val_loss"
-        ),
-        keras.callbacks.TensorBoard(
-            log_dir="./data/08_reporting"
-        )
-    ]
+    model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
+        filepath=filepath, save_best_only=True, monitor="val_loss"
+    )
+
+    tensorboard_callback = keras.callbacks.TensorBoard(
+        log_dir="./data/08_reporting"
+    )
 
     model.fit(
-        x=x_train,
-        y=y_train,
+        x=x,
+        y=y,
+        validation_split=validation_split,
         batch_size=64,
-        validation_data=(x_val, y_val),
-        callbacks=callbacks,
-        epochs=sys.maxsize  # in callbacks, we trust
+        epochs=sys.maxsize,  # in callbacks, we trust
+        callbacks=[early_stopping_callback, model_checkpoint_callback, tensorboard_callback],
     )
 
     return model

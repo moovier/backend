@@ -68,6 +68,13 @@ normalized_ratings:
   filepath: data/05_model_input/ratings.csv
   versioned: false
 
+built_model:
+  type: tensorflow.TensorFlowModelDataset
+  filepath: data/06_models/moovier.h5
+  save_args:
+    save_format: h5
+  versioned: false
+
 trained_model:
   type: tensorflow.TensorFlowModelDataset
   filepath: data/06_models/moovier.h5
