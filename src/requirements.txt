@@ -1,7 +1,10 @@
+black~=22.0
 numpy==1.24.4
 pandas==1.5.3
-scikit-learn==1.2.2
+scikit-learn~=1.2
 pycaret==3.2.0
 tensorflow==2.15.0
 keras==2.15.0
-kedro==0.18.14
+kedro~=0.18.14
+kedro-datasets~=1.0
+kedro-viz~=6.0
