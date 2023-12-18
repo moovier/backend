@@ -1,35 +1,25 @@
-import os
-import keras
-import http3
-import re
 import asyncio
+import os
+import pathlib
+import re
+from typing import Iterable
+
+import http3
+import keras
+import pandas as pd
 from aiocache import cached
 from aiocache.serializers import PickleSerializer
-
-
-import pathlib
-from typing import Any, Iterable, Union, Annotated
-
 from fastapi import Depends, FastAPI, HTTPException
 from kedro.framework.context import KedroContext
 from kedro.framework.session import KedroSession
 from kedro.framework.startup import bootstrap_project
+from pydantic import BaseModel
 
-
-# GET /models -> [string] 
-#   # ls "models" folder
-#   # ["moovier_emb_10", "moovier_emb_25", "moovier_emb_50"]
-
-# POST /predict (model_name: string) (input: [rows]) -> predictions
-#    # take model name, inputs=(user_id) provided in api
-#    # call recommend_movies_node with intermediate data from kedro run files /data/04_feature/...
-#    # fetch movies for each movie id from tmdb api (#nice-to-have till due date)
-#    # return result as json
-
-# POST /train (model_name: string) (input: [row]) (expexted_output: [output]) -> [metric]
-#   # call/invoke train_model_node kedro node which calls train_model function
-#   # body needs user, movie, rating - validate user make sure it's within in the range as in data dir
-#   # save the new model in models dir with new name so that 
+from src.backend.pipelines.pipeline.nodes import (
+    recommend_movies_node,
+    train_model_node,
+    normalize_ratings_node,
+)
 
 
 class TMDBClient:
@@ -89,36 +79,41 @@ async def predict(
     model_name: str,
     user_ids: list[int],
     top_k: int,
-    session: KedroSession = Depends(get_session),
     context: KedroContext = Depends(get_context),
     tmdb_client: TMDBClient = Depends(TMDBClient.get_instance),
 ) -> dict[str, list[dict]]:
     if model_name not in list_models():
         raise HTTPException(status_code=404, detail="model not found")
 
-    model = keras.models.load_model(f"models/{model_name}.h5")
-
-    session.run("pipeline",
-        node_names=["recommend_movies"],
-        from_inputs={
-            "trained_model": model,
+    from_ctx = lambda x: context.catalog.load(x)
+    result = recommend_movies_node.run(
+        inputs={
+            "trained_model": keras.models.load_model(f"models/{model_name}.h5"),
+            "cleaned_movies": from_ctx("cleaned_movies"),
+            "movies_to_tmdb": from_ctx("movies_to_tmdb"),
+            "normalized_ratings": from_ctx("normalized_ratings"),
+            "movies_to_indices": from_ctx("movies_to_indices"),
+            "indices_to_movies": from_ctx("indices_to_movies"),
+            "users_to_indices": from_ctx("users_to_indices"),
+            "params:top_k": top_k,
             "params:user_ids": user_ids,
-            "params:top_k": top_k
-        },
+        }
     )
 
-    result = context.catalog.load("recommended_movies").to_dict()["recommendations"]
-    group = []
-    for val in result.values():
-        movie_ids = val.split(",")
-        group.append(tmdb_client.fetch_movies(movie_ids))
+    mappings = {}
+    for _, row in result["recommended_movies"].iterrows():
+        user, rec = row.user, row.recommendations
+        movie_ids = rec.split(",") if "," in rec else [rec]
+        movies = await tmdb_client.fetch_movies(movie_ids)
+        mappings[user] = movies
 
-    all_movies = await asyncio.gather(*group)
+    return mappings
 
-    for key, movies in zip(result, all_movies):
-        result[key] = movies
 
-    return result
+class DataFrame(BaseModel):
+    users: list[int]
+    movies: list[int]
+    ratings: list[int]
 
 
 @app.post("/train")
@@ -126,35 +121,38 @@ def train(
     model_name: str,
     validation_split: float,
     patience: float,
-    ratings: list,
-    session: KedroSession = Depends(get_session),
-    context: KedroContext = Depends(get_context),
+    body: DataFrame,
 ) -> str:
     if not model_name.replace("_", "").isalnum():
         raise HTTPException(status_code=400, detail="invalid model name")
 
-    session.run("pipeline",
-        node_names=["train_model"],
-        from_inputs={
-            "built_model": keras.models.load_model(f"models/{model_name}.h5", safe_mode=False),
-            "ratings": ratings,
+    if len({len(l) for l in [body.users, body.movies, body.ratings]}) != 1:
+        raise HTTPException(status_code=400, detail="incomplete dataset for training")
+
+    if any(x not in [1, 2, 3, 4, 5] for x in body.ratings):
+        raise HTTPException(status_code=400, detail="invalid ratings")
+
+    dataset = pd.DataFrame({"user": body.users, "movie": body.movies, "rating": body.ratings})
+    dataset = normalize_ratings_node.run(inputs={"indexed_ratings": dataset})
+
+    trained_model = train_model_node.run(
+        inputs={
+            "built_model": keras.models.load_model(f"models/{model_name}.h5"),
+            "normalized_ratings": dataset["normalized_ratings"],
             "params:validation_split": validation_split,
-            "params:patience": patience,
-        },
+            "params:patience": patience
+        }
     )
 
-    last_training = extract_last_training(model_name)
-    new_model_name = f"{extract_prefix(model_name)}_{last_training + 1}"
-
+    new_model_name = update_model_name(model_name)
     pathlib.Path(f"models/{model_name}.h5").unlink()
-    context.catalog.load("trained_model").save(f"models/{new_model_name}.h5")
+    trained_model["trained_model"].save(f"models/{new_model_name}")
+
     return new_model_name
 
 
-def extract_last_training(file_name):
-    match = re.search(r'_trained_(\d+)', file_name)
-    return int(match.group(1)) if match else 0
-
-
-def extract_prefix(file_name):
-    return re.sub(r'_\d+$', '', file_name)
+def update_model_name(model_name) -> str:
+    match = re.search(r'_trained_(\d+)', model_name)
+    prefix = re.sub(r'_\d+$', '', model_name)
+    last_training = int(match.group(1)) if match else 0
+    return f"{prefix}_{last_training + 1}.h5"
