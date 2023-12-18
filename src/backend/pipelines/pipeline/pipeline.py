@@ -8,7 +8,8 @@ from .nodes import (
     build_model_node,
     recommend_movies_node,
     drop_imdb_column_node,
-    train_model_node
+    train_model_node,
+    pycaret_node,
 )
 
 actions = [
@@ -21,6 +22,7 @@ actions = [
     build_model_node,
     train_model_node,
     recommend_movies_node,
+    pycaret_node,
 ]
 
 

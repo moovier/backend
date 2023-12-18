@@ -4,3 +4,4 @@ embedding_size: 50
 patience: 10
 top_k: 10
 user_ids: [1, 263, 474, 580, 606, 610]
+user_rating: "rating"

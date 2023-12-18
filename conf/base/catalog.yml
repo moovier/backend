@@ -86,3 +86,13 @@ recommended_movies:
   type: pandas.CSVDataset
   filepath: data/07_model_output/recommendations.csv
   versioned: false
+
+rating_predictions:
+  type: pandas.CSVDataset
+  filepath: data/07_model_output/rating_predictions.csv
+  versioned: false
+
+regression_model_metrics:
+  type: pandas.CSVDataset
+  filepath: data/07_model_output/regression_model_metrics.csv
+  versioned: false
