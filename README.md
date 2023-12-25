@@ -26,6 +26,8 @@ To use this application, an [TMDB API](https://www.themoviedb.org/) key is requi
 The project can be either run as a standalone [Kedro](https://kedro.org/) pipeline using `kedro run` or as
 a back-end API using `uvicorn app:app`. The application exposes the following endpoints:
 
+#### API
+
  - `/models` serves the names of pre-trained models that can be used for inference or fine-tuning.
     ```bash
    curl -X 'GET' \
@@ -49,4 +51,10 @@ a back-end API using `uvicorn app:app`. The application exposes the following en
    -H 'Content-Type: multipart/form-data' \
    -F 'ratings=string'
    ```
+
+#### Kedro
+To run only prycaret nodes
+```bash
+kedro run --nodes=pycaret_merge_datasets,pycaret_predict_ratings 
+```
 
