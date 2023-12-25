@@ -1,7 +1,7 @@
 validation_split: 0.9
 learning_rate: 0.001
-embedding_size: 50
+embedding_size: 10
 patience: 5
-optuna_trials: 1
+optuna_trials: 10
 top_k: 10
 user_ids: [1, 263, 474, 580, 606, 610]
