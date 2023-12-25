@@ -73,6 +73,11 @@ normalized_ratings:
   filepath: data/05_model_input/ratings.csv
   versioned: false
 
+pycaret_merged_dataset:
+  type: pandas.CSVDataset
+  filepath: data/05_model_input/pycaret_model_input.csv
+  versioned: false
+
 built_model:
   type: tensorflow.TensorFlowModelDataset
   filepath: data/06_models/moovier.h5
@@ -85,6 +90,11 @@ trained_model:
   filepath: data/06_models/moovier.h5
   save_args:
     save_format: h5
+  versioned: false
+
+pycaret_model:
+  type: kedro.extras.datasets.pickle.PickleDataSet
+  filepath: data/06_models/pycaret_model.pkl
   versioned: false
 
 recommended_movies:

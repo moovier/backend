@@ -271,13 +271,13 @@ recommend_movies_node = node(
 pycaret_merge_datasets_node = node(
     func=pycaret_merge_datasets,
     inputs=["movies", "ratings", "tags"],
-    outputs="pycaret_dataset",
-    name=pycaret_merge_datasets.__name__
+    outputs="pycaret_merged_dataset",
+    name=pycaret_merge_datasets.__name__,
 )
 
 pycaret_predict_ratings_node = node(
     func=pycaret_predict_ratings,
-    inputs=["pycaret_dataset", "params:pycaret_user_rating"],
+    inputs=["pycaret_merged_dataset", "params:pycaret_user_rating"],
     outputs=["pycaret_model", "pycaret_rating_predictions", "pycaret_model_metrics"],
     name=pycaret_predict_ratings.__name__,
 )
