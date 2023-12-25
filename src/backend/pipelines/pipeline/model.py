@@ -1,5 +1,6 @@
 import sys
 
+import pandas as pd
 import tensorflow as tf
 import keras
 from keras import layers, metrics, losses
@@ -19,7 +20,7 @@ metrics = [
 ]
 
 
-def build_recommender_model(num_users, num_movies, embedding_size):
+def build_recommender_model(num_users: int, num_movies: int, embedding_size: int) -> keras.Model:
     user_input = layers.Input(shape=(1,), name="user_input", dtype=tf.int32)
     movie_input = layers.Input(shape=(1,), name="movie_input", dtype=tf.int32)
 
@@ -48,11 +49,12 @@ def build_recommender_model(num_users, num_movies, embedding_size):
 
 
 def build_recommender(
-    num_users,
-    num_movies,
-    embedding_size,
-    learning_rate,
-):
+    num_users: int,
+    num_movies: int,
+    embedding_size: int,
+    learning_rate: float,
+) -> keras.Model:
+
     model = build_recommender_model(
         num_users=num_users,
         num_movies=num_movies,
@@ -68,12 +70,12 @@ def build_recommender(
 
 
 def train_recommender(
-    x,
-    y,
-    model,
-    validation_split,
-    patience,
-):
+    x: list[pd.Series],
+    y: pd.Series,
+    model: keras.Model,
+    validation_split: float,
+    patience: int,
+) -> keras.Model:
     early_stopping_callback = keras.callbacks.EarlyStopping("val_loss", patience=patience)
     tensorboard_callback = keras.callbacks.TensorBoard("./data/08_reporting")
     model_checkpoint_callback = keras.callbacks.ModelCheckpoint(filepath, "val_loss", save_best_only=True)

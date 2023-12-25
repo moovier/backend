@@ -1,3 +1,4 @@
+import keras
 import numpy as np
 import pandas as pd
 from kedro.pipeline import node
@@ -6,22 +7,22 @@ from .model import build_recommender, train_recommender
 from .optuna import optuna_study
 
 
-def drop_genres_and_title(movies):
+def drop_genres_and_title(movies: pd.DataFrame) -> pd.DataFrame:
     movies = movies.drop(columns="genres")
     movies = movies.drop(columns="title")
     return movies
 
 
-def drop_imbd_column(links):
+def drop_imbd_column(links: pd.DataFrame) -> pd.DataFrame:
     return links.drop(columns="imdbId")
 
 
-def drop_timestamp(ratings):
+def drop_timestamp(ratings: pd.DataFrame) -> pd.DataFrame:
     return ratings.drop(columns="timestamp")
 
 
-def index_ratings(ratings):
-    def create_index_maps(data_column):
+def index_ratings(ratings: pd.DataFrame) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame):
+    def create_index_maps(data_column: pd.Series) -> (dict[int, int], dict[int, int]):
         unique_values = data_column.unique().tolist()
 
         index_to_value_map = dict(enumerate(unique_values))
@@ -44,7 +45,7 @@ def index_ratings(ratings):
     )
 
 
-def create_tmdb_mapping(links):
+def create_tmdb_mapping(links: pd.DataFrame) -> pd.DataFrame:
     links = links.to_dict()
     return pd.DataFrame({
         "movieId": links["movieId"],
@@ -52,7 +53,7 @@ def create_tmdb_mapping(links):
     })
 
 
-def normalize_ratings(ratings):
+def normalize_ratings(ratings: pd.DataFrame) -> pd.DataFrame:
     min_rating, max_rating = min(ratings.rating), max(ratings.rating)
 
     def normalizer(x):
@@ -63,7 +64,7 @@ def normalize_ratings(ratings):
     return ratings
 
 
-def build_model(ratings, embedding_size, learning_rate):
+def build_model(ratings: pd.DataFrame, embedding_size: int, learning_rate: float) -> keras.Model:
     return build_recommender(
         num_users=ratings.user.nunique(),
         num_movies=ratings.movie.nunique(),
@@ -72,7 +73,7 @@ def build_model(ratings, embedding_size, learning_rate):
     )
 
 
-def train_model(model, ratings, validation_split, patience):
+def train_model(model: keras.Model, ratings: pd.DataFrame, validation_split: float, patience: int) -> keras.Model:
     return train_recommender(
         x=[ratings.user.values, ratings.movie.values],
         y=ratings.rating.values,
@@ -83,15 +84,15 @@ def train_model(model, ratings, validation_split, patience):
 
 
 def recommend_movies(
-    model,
-    movies,
-    movies_to_tmdb,
-    ratings,
-    movies_to_indices,
-    indices_to_movies,
-    users_to_indices,
-    top_k,
-    user_ids
+    model: keras.Model,
+    movies: pd.DataFrame,
+    movies_to_tmdb: pd.DataFrame,
+    ratings: pd.DataFrame,
+    movies_to_indices: pd.DataFrame,
+    indices_to_movies: pd.DataFrame,
+    users_to_indices: pd.DataFrame,
+    top_k: int,
+    user_ids: list[int]
 ):
     movies_to_tmdb = movies_to_tmdb.set_index("movieId")["tmdbId"].to_dict()
     movies_to_indices = movies_to_indices.set_index("movies")["indices"].to_dict()
