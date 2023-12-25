@@ -55,6 +55,6 @@ a back-end API using `uvicorn app:app`. The application exposes the following en
 #### Kedro
 To run only prycaret nodes
 ```bash
-kedro run --nodes=pycaret_merge_datasets,pycaret_predict_ratings 
+kedro run --nodes=pycaret_predict_ratings 
 ```
 
