@@ -82,7 +82,19 @@ trained_model:
     save_format: h5
   versioned: false
 
+optuna_model:
+  type: tensorflow.TensorFlowModelDataset
+  filepath: data/06_models/optuna_moovier.h5
+  save_args:
+    save_format: h5
+  versioned: false
+
 recommended_movies:
   type: pandas.CSVDataset
   filepath: data/07_model_output/recommendations.csv
+  versioned: false
+
+optuna_recommended_movies:
+  type: pandas.CSVDataset
+  filepath: data/07_model_output/optuna_recommendations.csv
   versioned: false

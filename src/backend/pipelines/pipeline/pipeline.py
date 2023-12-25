@@ -8,7 +8,9 @@ from .nodes import (
     build_model_node,
     recommend_movies_node,
     drop_imdb_column_node,
-    train_model_node
+    train_model_node,
+    optuna_model_node,
+    optuna_recommend_movies_node,
 )
 
 actions = [
@@ -21,6 +23,8 @@ actions = [
     build_model_node,
     train_model_node,
     recommend_movies_node,
+    optuna_model_node,
+    optuna_recommend_movies_node,
 ]
 
 

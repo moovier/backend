@@ -2,8 +2,7 @@ import sys
 
 import tensorflow as tf
 import keras
-from keras.optimizers import Adam
-from keras import layers
+from keras import layers, metrics, losses
 from kedro.config import ConfigLoader
 
 filepath = (
@@ -13,12 +12,16 @@ filepath = (
     .get("filepath")
 )
 
+metrics = [
+    metrics.MeanSquaredError(),
+    metrics.MeanAbsoluteError(),
+    metrics.RootMeanSquaredError(),
+]
+
 
 def build_recommender_model(num_users, num_movies, embedding_size):
-
-    input_pair = keras.Input(shape=(2,), name="user_movie_input", dtype=tf.int32)
-    user_input = layers.Lambda(lambda x: x[:, 0])(input_pair)
-    movie_input = layers.Lambda(lambda x: x[:, 1])(input_pair)
+    user_input = layers.Input(shape=(1,), name="user_input", dtype=tf.int32)
+    movie_input = layers.Input(shape=(1,), name="movie_input", dtype=tf.int32)
 
     user_embedding = layers.Embedding(
         input_dim=num_users,
@@ -37,12 +40,11 @@ def build_recommender_model(num_users, num_movies, embedding_size):
     user_bias = layers.Embedding(input_dim=num_users, output_dim=1)(user_input)
     movie_bias = layers.Embedding(input_dim=num_movies, output_dim=1)(movie_input)
 
-    dot_user_movie = layers.Dot(axes=-1)([user_embedding, movie_embedding])
-    x = layers.Add()([dot_user_movie, user_bias, movie_bias])
+    x = layers.Dot(axes=-1)([user_embedding, movie_embedding])
+    x = layers.Add()([x, user_bias, movie_bias])
+    x = layers.Dense(units=1, activation="relu", name="rating_prediction")(x)
 
-    output = layers.Activation("sigmoid")(x)
-
-    return keras.Model(inputs=input_pair, outputs=output, name='recommender-net')
+    return keras.Model(inputs=[user_input, movie_input], outputs=x, name='recommender-net')
 
 
 def build_recommender(
@@ -58,11 +60,10 @@ def build_recommender(
     )
 
     model.compile(
-        loss="binary_crossentropy",
-        optimizer=Adam(learning_rate=learning_rate),
-        metrics=["binary_crossentropy"]
+        loss=losses.MeanSquaredError(),
+        metrics=metrics,
+        optimizer=keras.optimizers.RMSprop(learning_rate=learning_rate),
     )
-
     return model
 
 
@@ -73,24 +74,16 @@ def train_recommender(
     validation_split,
     patience,
 ):
-    early_stopping_callback = keras.callbacks.EarlyStopping(
-        monitor="val_loss", patience=patience,
-    )
-
-    model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
-        filepath=filepath, save_best_only=True, monitor="val_loss"
-    )
-
-    tensorboard_callback = keras.callbacks.TensorBoard(
-        log_dir="./data/08_reporting"
-    )
+    early_stopping_callback = keras.callbacks.EarlyStopping("val_loss", patience=patience)
+    tensorboard_callback = keras.callbacks.TensorBoard("./data/08_reporting")
+    model_checkpoint_callback = keras.callbacks.ModelCheckpoint(filepath, "val_loss", save_best_only=True)
 
     model.fit(
         x=x,
         y=y,
         validation_split=validation_split,
         batch_size=64,
-        epochs=sys.maxsize,  # in callbacks, we trust
+        epochs=sys.maxsize,
         callbacks=[early_stopping_callback, model_checkpoint_callback, tensorboard_callback],
     )
 
