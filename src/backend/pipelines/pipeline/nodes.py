@@ -158,8 +158,13 @@ def recommend_movies(
         recommended_movies_for_all_users.append(column)
     return pd.DataFrame(recommended_movies_for_all_users)
 
+def pycaret_merge_datasets(movies, ratings, tags):
+    movies_ratings = pd.merge(movies, ratings, on='movieId', how='inner')
+    merged_dataset = pd.merge(movies_ratings, tags, on=['userId', 'movieId'], how='left')
 
-def predict_ratings(data, target_column):
+    return merged_dataset
+
+def pycaret_predict_ratings(data, target_column):
     train_data, validation_data = train_test_split(data, test_size=0.2, random_state=123)
     regression_setup = setup(train_data, target=target_column, session_id=123, fold=5)
 
@@ -263,9 +268,16 @@ recommend_movies_node = node(
     name=recommend_movies.__name__,
 )
 
-pycaret_node = node(
-    func=predict_ratings,
-    inputs=["ratings", "params:user_rating"],
-    outputs=["rating_predict_model", "rating_predictions", "regression_model_metrics"],
-    name=predict_ratings.__name__,
+pycaret_merge_datasets_node = node(
+    func=pycaret_merge_datasets,
+    inputs=["movies", "ratings", "tags"],
+    outputs="pycaret_dataset",
+    name=pycaret_merge_datasets.__name__
+)
+
+pycaret_predict_ratings_node = node(
+    func=pycaret_predict_ratings,
+    inputs=["pycaret_dataset", "params:pycaret_user_rating"],
+    outputs=["pycaret_model", "pycaret_rating_predictions", "pycaret_model_metrics"],
+    name=pycaret_predict_ratings.__name__,
 )

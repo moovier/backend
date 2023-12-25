@@ -18,6 +18,11 @@ links:
   filepath: data/01_raw/links.csv
   versioned: false
 
+tags:
+  type: pandas.CSVDataset
+  filepath: data/01_raw/tags.csv
+  versioned: false
+
 cleaned_movies:
   type: pandas.CSVDataset
   filepath: data/02_intermediate/movies.csv
@@ -87,12 +92,12 @@ recommended_movies:
   filepath: data/07_model_output/recommendations.csv
   versioned: false
 
-rating_predictions:
+pycaret_rating_predictions:
   type: pandas.CSVDataset
-  filepath: data/07_model_output/rating_predictions.csv
+  filepath: data/07_model_output/pycaret_rating_predictions.csv
   versioned: false
 
-regression_model_metrics:
+pycaret_model_metrics:
   type: pandas.CSVDataset
-  filepath: data/07_model_output/regression_model_metrics.csv
+  filepath: data/07_model_output/pycaret_model_metrics.csv
   versioned: false

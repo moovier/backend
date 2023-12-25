@@ -9,7 +9,8 @@ from .nodes import (
     recommend_movies_node,
     drop_imdb_column_node,
     train_model_node,
-    pycaret_node,
+    pycaret_merge_datasets_node,
+    pycaret_predict_ratings_node,
 )
 
 actions = [
@@ -22,7 +23,8 @@ actions = [
     build_model_node,
     train_model_node,
     recommend_movies_node,
-    pycaret_node,
+    pycaret_merge_datasets_node,
+    pycaret_predict_ratings_node,
 ]
 
 
