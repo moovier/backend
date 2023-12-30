@@ -158,9 +158,14 @@ def recommend_movies(
         recommended_movies_for_all_users.append(column)
     return pd.DataFrame(recommended_movies_for_all_users)
 
-def pycaret_merge_datasets(movies, ratings):
-    drop_timestamp(ratings)
-    return pd.merge(movies, ratings, on="movieId", how="inner")
+def pycaret_merge_datasets(movies, ratings, tags, links):
+    ratings.drop(columns="timestamp", inplace=True)
+    tags.drop(columns="timestamp", inplace=True)
+    movie_rating = pd.merge(movies, ratings, on="movieId", how="inner")
+    movie_rating_tag = pd.merge(movie_rating, tags, on=["userId", "movieId"], how="inner")
+    final_df = pd.merge(movie_rating_tag, links, on="movieId", how="inner")
+
+    return final_df
 
 def pycaret_predict_ratings(data, target_column):
     train_data, validation_data = train_test_split(data, test_size=0.2, random_state=123)
@@ -268,7 +273,7 @@ recommend_movies_node = node(
 
 pycaret_merge_datasets_node = node(
     func=pycaret_merge_datasets,
-    inputs=["movies", "ratings"],
+    inputs=["movies", "ratings", "tags", "links"],
     outputs="pycaret_merged_dataset",
     name=pycaret_merge_datasets.__name__,
 )
