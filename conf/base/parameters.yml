@@ -1,6 +1,6 @@
 validation_split: 0.9
 learning_rate: 0.001
-embedding_size: 10
+embedding_size: 5
 patience: 5
 optuna_trials: 10
 top_k: 10

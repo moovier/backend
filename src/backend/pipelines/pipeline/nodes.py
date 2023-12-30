@@ -79,7 +79,8 @@ def train_model(model: keras.Model, ratings: pd.DataFrame, validation_split: flo
         y=ratings.rating.values,
         model=model,
         validation_split=validation_split,
-        patience=patience
+        patience=patience,
+        id="kedro"
     )
 
 

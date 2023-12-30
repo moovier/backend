@@ -4,6 +4,7 @@ import pandas as pd
 import tensorflow as tf
 import keras
 from keras import layers, metrics, losses
+from keras.utils import plot_model
 from kedro.config import ConfigLoader
 
 filepath = (
@@ -24,28 +25,25 @@ def build_recommender_model(num_users: int, num_movies: int, embedding_size: int
     user_input = layers.Input(shape=(1,), name="user_input", dtype=tf.int32)
     movie_input = layers.Input(shape=(1,), name="movie_input", dtype=tf.int32)
 
-    user_embedding = layers.Embedding(
-        input_dim=num_users,
-        output_dim=embedding_size,
-        embeddings_initializer="he_normal",
-        embeddings_regularizer=keras.regularizers.l2(1e-6),
-    )(user_input)
+    movie_embedding_mlp = layers.Embedding(num_movies, embedding_size, name="movie_embedding_mlp")(movie_input)
+    movie_vec_mlp = layers.Flatten(name="flatten_movie_mlp")(movie_embedding_mlp)
 
-    movie_embedding = layers.Embedding(
-        input_dim=num_movies,
-        output_dim=embedding_size,
-        embeddings_initializer="he_normal",
-        embeddings_regularizer=keras.regularizers.l2(1e-6),
-    )(movie_input)
+    user_embedding_mlp = layers.Embedding(num_users, embedding_size, name="user_embedding_mlp")(user_input)
+    user_vec_mlp = layers.Flatten(name="flatten_user_mlp")(user_embedding_mlp)
 
-    user_bias = layers.Embedding(input_dim=num_users, output_dim=1)(user_input)
-    movie_bias = layers.Embedding(input_dim=num_movies, output_dim=1)(movie_input)
+    movie_embedding_mf = layers.Embedding(num_movies, embedding_size, name="movie_embedding_mf")(movie_input)
+    movie_vec_mf = layers.Flatten(name="flatten_movie_mf")(movie_embedding_mf)
 
-    x = layers.Dot(axes=-1)([user_embedding, movie_embedding])
-    x = layers.Add()([x, user_bias, movie_bias])
-    x = layers.Dense(units=1, activation="relu", name="rating_prediction")(x)
+    user_embedding_mf = layers.Embedding(num_users, embedding_size, name="user_embedding_mf")(user_input)
+    user_vec_mf = layers.Flatten(name="flatten_user_mf")(user_embedding_mf)
 
-    return keras.Model(inputs=[user_input, movie_input], outputs=x, name='recommender-net')
+    concat = layers.Concatenate()([movie_vec_mlp, user_vec_mlp])
+    pred_mlp = layers.Dense(units=10, name="pred_mlp", activation="relu")(concat)
+    pred_mf = layers.Dot(axes=-1, name="pred_mf")([movie_vec_mf, user_vec_mf])
+    combine_mlp_mf = layers.Concatenate()([pred_mf, pred_mlp])
+
+    result = layers.Dense(1, name="result", activation="relu")(combine_mlp_mf)
+    return keras.Model(inputs=[user_input, movie_input], outputs=result, name="recommender-net")
 
 
 def build_recommender(
@@ -62,9 +60,9 @@ def build_recommender(
     )
 
     model.compile(
-        loss=losses.MeanSquaredError(),
+        loss=losses.MeanAbsoluteError(),
         metrics=metrics,
-        optimizer=keras.optimizers.RMSprop(learning_rate=learning_rate),
+        optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
     )
     return model
 
@@ -75,9 +73,11 @@ def train_recommender(
     model: keras.Model,
     validation_split: float,
     patience: int,
+    id: str,
 ) -> keras.Model:
+
     early_stopping_callback = keras.callbacks.EarlyStopping("val_loss", patience=patience)
-    tensorboard_callback = keras.callbacks.TensorBoard("./data/08_reporting")
+    tensorboard_callback = keras.callbacks.TensorBoard(f"./data/08_reporting/{id}/tensorboard")
     model_checkpoint_callback = keras.callbacks.ModelCheckpoint(filepath, "val_loss", save_best_only=True)
 
     model.fit(
@@ -87,6 +87,13 @@ def train_recommender(
         batch_size=64,
         epochs=sys.maxsize,
         callbacks=[early_stopping_callback, model_checkpoint_callback, tensorboard_callback],
+    )
+
+    plot_model(
+        model,
+        to_file=f"./data/08_reporting/{id}/{model.name}.png",
+        show_layer_names=True,
+        show_layer_activations=True,
     )
 
     return model
