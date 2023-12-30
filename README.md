@@ -23,8 +23,11 @@ To use this application, an [TMDB API](https://www.themoviedb.org/) key is requi
 
 ### Usage
 
-The project can be either run as a standalone [Kedro](https://kedro.org/) pipeline using `kedro run` or as
-a back-end API using `uvicorn app:app`. The application exposes the following endpoints:
+The project can be either run as a standalone [Kedro](https://kedro.org/) pipeline using `kedro run --to-outputs "recommended_movies"` or as
+a back-end API using `uvicorn app:app`. 
+To obtain recommendations based on a model hyper-tuned by [Optuna](https://optuna.org/) run `kedro run --to-outputs "optuna_recommended_movies"`. 
+To obtain recommendations based on a model created by [PyCaret](https://pycaret.org/) run `kedro run --to-outputs "pycaret_model","pycaret_rating_predictions","pycaret_model_metrics"`. 
+The application exposes the following endpoints:
 
 #### API
 
