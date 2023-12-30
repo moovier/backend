@@ -277,7 +277,7 @@ pycaret_merge_datasets_node = node(
 
 pycaret_predict_ratings_node = node(
     func=pycaret_predict_ratings,
-    inputs=["pycaret_merged_dataset", "params:pycaret_user_rating"],
+    inputs=["pycaret_merged_dataset", "params:pycaret_target_column"],
     outputs=["pycaret_model", "pycaret_rating_predictions", "pycaret_model_metrics"],
     name=pycaret_predict_ratings.__name__,
 )
