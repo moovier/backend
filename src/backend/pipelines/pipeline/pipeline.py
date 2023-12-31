@@ -11,6 +11,9 @@ from .nodes import (
     train_model_node,
     optuna_model_node,
     optuna_recommend_movies_node,
+    train_model_node,
+    pycaret_merge_datasets_node,
+    pycaret_predict_ratings_node,
 )
 
 actions = [
@@ -25,6 +28,8 @@ actions = [
     recommend_movies_node,
     optuna_model_node,
     optuna_recommend_movies_node,
+    pycaret_merge_datasets_node,
+    pycaret_predict_ratings_node,
 ]
 
 

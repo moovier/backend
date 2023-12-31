@@ -2,7 +2,15 @@ import keras
 import numpy as np
 import pandas as pd
 from kedro.pipeline import node
-
+from sklearn.model_selection import train_test_split
+from pycaret.regression import (
+    setup,
+    compare_models,
+    create_model,
+    predict_model,
+    finalize_model,
+    pull,
+)
 from .model import build_recommender, train_recommender
 from .optuna import optuna_study
 
@@ -39,18 +47,26 @@ def index_ratings(ratings: pd.DataFrame) -> (pd.DataFrame, pd.DataFrame, pd.Data
 
     return (
         ratings,
-        pd.DataFrame({"movies": movies_to_indices.keys(), "indices": movies_to_indices.values()}),
-        pd.DataFrame({"indices": indices_to_movies.keys(), "movies": indices_to_movies.values()}),
-        pd.DataFrame({"users": users_to_indices.keys(), "indices": users_to_indices.values()}),
+        pd.DataFrame(
+            {"movies": movies_to_indices.keys(), "indices": movies_to_indices.values()}
+        ),
+        pd.DataFrame(
+            {"indices": indices_to_movies.keys(), "movies": indices_to_movies.values()}
+        ),
+        pd.DataFrame(
+            {"users": users_to_indices.keys(), "indices": users_to_indices.values()}
+        ),
     )
 
 
 def create_tmdb_mapping(links: pd.DataFrame) -> pd.DataFrame:
     links = links.to_dict()
-    return pd.DataFrame({
-        "movieId": links["movieId"],
-        "tmdbId": links["tmdbId"],
-    })
+    return pd.DataFrame(
+        {
+            "movieId": links["movieId"],
+            "tmdbId": links["tmdbId"],
+        }
+    )
 
 
 def normalize_ratings(ratings: pd.DataFrame) -> pd.DataFrame:
@@ -93,7 +109,7 @@ def recommend_movies(
     indices_to_movies: pd.DataFrame,
     users_to_indices: pd.DataFrame,
     top_k: int,
-    user_ids: list[int]
+    user_ids: list[int],
 ):
     movies_to_tmdb = movies_to_tmdb.set_index("movieId")["tmdbId"].to_dict()
     movies_to_indices = movies_to_indices.set_index("movies")["indices"].to_dict()
@@ -129,6 +145,32 @@ def recommend_movies(
 
         recommended_movies_for_all_users.append({**column, **metrics})
     return pd.DataFrame(recommended_movies_for_all_users)
+
+
+def pycaret_merge_datasets(movies, ratings, tags, links):
+    ratings.drop(columns="timestamp", inplace=True)
+    tags.drop(columns="timestamp", inplace=True)
+    movie_rating = pd.merge(movies, ratings, on="movieId", how="inner")
+    movie_rating_tag = pd.merge(movie_rating, tags, on=["userId", "movieId"], how="inner")
+    final_df = pd.merge(movie_rating_tag, links, on="movieId", how="inner")
+
+    return final_df
+
+
+def pycaret_predict_ratings(data, target_column):
+    train_data, validation_data = train_test_split(data, test_size=0.2, random_state=123)
+    regression_setup = setup(train_data, target=target_column, session_id=123, fold=5)
+
+    best_model = compare_models()
+    model = create_model(best_model)
+
+    finalized_model = finalize_model(model)
+
+    validation_predictions = predict_model(finalized_model, data=validation_data)
+
+    metrics = pull()
+
+    return finalized_model, validation_predictions, metrics
 
 
 drop_genres_and_title_node = node(
@@ -195,7 +237,7 @@ train_model_node = node(
         "built_model",
         "normalized_ratings",
         "params:validation_split",
-        "params:patience"
+        "params:patience",
     ],
     outputs="trained_model",
     name=train_model.__name__,
@@ -212,10 +254,24 @@ recommend_movies_node = node(
         "indices_to_movies",
         "users_to_indices",
         "params:top_k",
-        "params:user_ids"
+        "params:user_ids",
     ],
     outputs="recommended_movies",
     name=recommend_movies.__name__,
+)
+
+pycaret_merge_datasets_node = node(
+    func=pycaret_merge_datasets,
+    inputs=["movies", "ratings", "tags", "links"],
+    outputs="pycaret_merged_dataset",
+    name=pycaret_merge_datasets.__name__,
+)
+
+pycaret_predict_ratings_node = node(
+    func=pycaret_predict_ratings,
+    inputs=["pycaret_merged_dataset", "params:pycaret_target_column"],
+    outputs=["pycaret_model", "pycaret_rating_predictions", "pycaret_model_metrics"],
+    name=pycaret_predict_ratings.__name__,
 )
 
 optuna_model_node = node(

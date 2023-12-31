@@ -5,3 +5,4 @@ patience: 5
 optuna_trials: 10
 top_k: 10
 user_ids: [1, 263, 474, 580, 606, 610]
+pycaret_target_column: "rating"

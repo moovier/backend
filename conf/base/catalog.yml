@@ -18,6 +18,11 @@ links:
   filepath: data/01_raw/links.csv
   versioned: false
 
+tags:
+  type: pandas.CSVDataset
+  filepath: data/01_raw/tags.csv
+  versioned: false
+
 cleaned_movies:
   type: pandas.CSVDataset
   filepath: data/02_intermediate/movies.csv
@@ -68,6 +73,11 @@ normalized_ratings:
   filepath: data/05_model_input/ratings.csv
   versioned: false
 
+pycaret_merged_dataset:
+  type: pandas.CSVDataset
+  filepath: data/05_model_input/pycaret_model_input.csv
+  versioned: false
+
 built_model:
   type: tensorflow.TensorFlowModelDataset
   filepath: data/06_models/moovier.h5
@@ -89,6 +99,11 @@ optuna_model:
     save_format: h5
   versioned: false
 
+pycaret_model:
+  type: kedro.extras.datasets.pickle.PickleDataSet
+  filepath: data/06_models/pycaret_model.pkl
+  versioned: false
+
 recommended_movies:
   type: pandas.CSVDataset
   filepath: data/07_model_output/recommendations.csv
@@ -97,4 +112,13 @@ recommended_movies:
 optuna_recommended_movies:
   type: pandas.CSVDataset
   filepath: data/07_model_output/optuna_recommendations.csv
+  versioned: false
+pycaret_rating_predictions:
+  type: pandas.CSVDataset
+  filepath: data/07_model_output/pycaret_rating_predictions.csv
+  versioned: false
+
+pycaret_model_metrics:
+  type: pandas.CSVDataset
+  filepath: data/07_model_output/pycaret_model_metrics.csv
   versioned: false
