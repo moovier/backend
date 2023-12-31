@@ -1,3 +1,4 @@
+import keras
 import numpy as np
 import pandas as pd
 from kedro.pipeline import node
@@ -11,24 +12,25 @@ from pycaret.regression import (
     pull,
 )
 from .model import build_recommender, train_recommender
+from .optuna import optuna_study
 
 
-def drop_genres_and_title(movies):
+def drop_genres_and_title(movies: pd.DataFrame) -> pd.DataFrame:
     movies = movies.drop(columns="genres")
     movies = movies.drop(columns="title")
     return movies
 
 
-def drop_imbd_column(links):
+def drop_imbd_column(links: pd.DataFrame) -> pd.DataFrame:
     return links.drop(columns="imdbId")
 
 
-def drop_timestamp(ratings):
+def drop_timestamp(ratings: pd.DataFrame) -> pd.DataFrame:
     return ratings.drop(columns="timestamp")
 
 
-def index_ratings(ratings):
-    def create_index_maps(data_column):
+def index_ratings(ratings: pd.DataFrame) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame):
+    def create_index_maps(data_column: pd.Series) -> (dict[int, int], dict[int, int]):
         unique_values = data_column.unique().tolist()
 
         index_to_value_map = dict(enumerate(unique_values))
@@ -57,7 +59,7 @@ def index_ratings(ratings):
     )
 
 
-def create_tmdb_mapping(links):
+def create_tmdb_mapping(links: pd.DataFrame) -> pd.DataFrame:
     links = links.to_dict()
     return pd.DataFrame(
         {
@@ -67,7 +69,7 @@ def create_tmdb_mapping(links):
     )
 
 
-def normalize_ratings(ratings):
+def normalize_ratings(ratings: pd.DataFrame) -> pd.DataFrame:
     min_rating, max_rating = min(ratings.rating), max(ratings.rating)
 
     def normalizer(x):
@@ -78,35 +80,36 @@ def normalize_ratings(ratings):
     return ratings
 
 
-def build_model(ratings, embedding_size, learning_rate):
+def build_model(ratings: pd.DataFrame, embedding_size: int, learning_rate: float) -> keras.Model:
     return build_recommender(
-        num_users=ratings["user"].nunique(),
-        num_movies=ratings["movie"].nunique(),
+        num_users=ratings.user.nunique(),
+        num_movies=ratings.movie.nunique(),
         embedding_size=embedding_size,
         learning_rate=learning_rate,
     )
 
 
-def train_model(model, ratings, validation_split, patience):
+def train_model(model: keras.Model, ratings: pd.DataFrame, validation_split: float, patience: int) -> keras.Model:
     return train_recommender(
-        x=ratings[["user", "movie"]].values,
-        y=ratings["rating"],
+        x=[ratings.user.values, ratings.movie.values],
+        y=ratings.rating.values,
         model=model,
         validation_split=validation_split,
         patience=patience,
+        id="kedro"
     )
 
 
 def recommend_movies(
-    model,
-    movies,
-    movies_to_tmdb,
-    ratings,
-    movies_to_indices,
-    indices_to_movies,
-    users_to_indices,
-    top_k,
-    user_ids,
+    model: keras.Model,
+    movies: pd.DataFrame,
+    movies_to_tmdb: pd.DataFrame,
+    ratings: pd.DataFrame,
+    movies_to_indices: pd.DataFrame,
+    indices_to_movies: pd.DataFrame,
+    users_to_indices: pd.DataFrame,
+    top_k: int,
+    user_ids: list[int],
 ):
     movies_to_tmdb = movies_to_tmdb.set_index("movieId")["tmdbId"].to_dict()
     movies_to_indices = movies_to_indices.set_index("movies")["indices"].to_dict()
@@ -115,48 +118,34 @@ def recommend_movies(
 
     recommended_movies_for_all_users = []
     for user_id in user_ids:
-        movies_watched = ratings[ratings["userId"] == user_id]
+        movies_watched = ratings[ratings.userId == user_id]
 
-        movies_not_watched = ~movies["movieId"].isin(movies_watched["movieId"].values)
-        movies_not_watched = movies[movies_not_watched]["movieId"]
+        movies_not_watched = ~movies.movieId.isin(movies_watched.movieId.values)
+        movies_not_watched = movies[movies_not_watched].movieId
         movies_not_watched = set(movies_not_watched) & set(movies_to_indices.keys())
         movies_not_watched = list(movies_not_watched)
-        movies_not_watched = [
-            [movies_to_indices.get(movie)] for movie in movies_not_watched
-        ]
+        movies_not_watched = [movies_to_indices.get(movie) for movie in movies_not_watched]
 
         user_encoder = users_to_indices.get(user_id)
+        inputs = {"user": [user_encoder] * len(movies_not_watched), "movie": movies_not_watched}
+        inputs = pd.DataFrame(inputs)
 
-        inputs = ([[user_encoder]] * len(movies_not_watched), movies_not_watched)
-        inputs = np.hstack(inputs)
-
-        ratings_pred = model.predict(inputs)
-        metrics = model.evaluate(x=inputs, y=ratings_pred, return_dict=True)
+        ratings_pred = model.predict([inputs.user.values, inputs.movie.values])
+        metrics = model.evaluate(x=[inputs.user.values, inputs.movie.values], y=ratings_pred, return_dict=True)
 
         ratings_pred = ratings_pred.flatten()
         ratings_sorted_indices = ratings_pred.argsort()[-top_k:][::-1]
 
-        recommended_movies = [
-            indices_to_movies.get(movies_not_watched[rating][0])
-            for rating in ratings_sorted_indices
-            if movies_not_watched[rating][0] in indices_to_movies
-        ]
-
-        recommended_movies = movies[movies["movieId"].isin(recommended_movies)][
-            "movieId"
-        ]
+        recommended_movies = [indices_to_movies.get(movies_not_watched[rating]) for rating in ratings_sorted_indices]
+        recommended_movies = movies[movies.movieId.isin(recommended_movies)].movieId
         recommended_movies = [movies_to_tmdb.get(rec) for rec in recommended_movies]
-        recommended_movies = [str(int(rec)) for rec in recommended_movies if rec]
+        recommended_movies = [str(int(rec)) for rec in recommended_movies]
 
-        column = {
-            "user": user_id,
-            "recommendations": ",".join(recommended_movies),
-            "binary_crossentropy": metrics.get("binary_crossentropy"),
-            "loss": metrics.get("loss"),
-        }
+        column = {"user": user_id, "recommendations": ",".join(recommended_movies)}
 
-        recommended_movies_for_all_users.append(column)
+        recommended_movies_for_all_users.append({**column, **metrics})
     return pd.DataFrame(recommended_movies_for_all_users)
+
 
 def pycaret_merge_datasets(movies, ratings, tags, links):
     ratings.drop(columns="timestamp", inplace=True)
@@ -166,6 +155,7 @@ def pycaret_merge_datasets(movies, ratings, tags, links):
     final_df = pd.merge(movie_rating_tag, links, on="movieId", how="inner")
 
     return final_df
+
 
 def pycaret_predict_ratings(data, target_column):
     train_data, validation_data = train_test_split(data, test_size=0.2, random_state=123)
@@ -253,7 +243,6 @@ train_model_node = node(
     name=train_model.__name__,
 )
 
-
 recommend_movies_node = node(
     func=recommend_movies,
     inputs=[
@@ -283,4 +272,33 @@ pycaret_predict_ratings_node = node(
     inputs=["pycaret_merged_dataset", "params:pycaret_target_column"],
     outputs=["pycaret_model", "pycaret_rating_predictions", "pycaret_model_metrics"],
     name=pycaret_predict_ratings.__name__,
+)
+
+optuna_model_node = node(
+    func=optuna_study,
+    inputs=[
+        "normalized_ratings",
+        "params:patience",
+        "params:optuna_trials",
+        "params:validation_split"
+    ],
+    outputs="optuna_model",
+    name=optuna_study.__name__,
+)
+
+optuna_recommend_movies_node = node(
+    func=recommend_movies,
+    inputs=[
+        "optuna_model",
+        "cleaned_movies",
+        "movies_to_tmdb",
+        "normalized_ratings",
+        "movies_to_indices",
+        "indices_to_movies",
+        "users_to_indices",
+        "params:top_k",
+        "params:user_ids"
+    ],
+    outputs="optuna_recommended_movies",
+    name=f"optuna_{recommend_movies.__name__}",
 )

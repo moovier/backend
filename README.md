@@ -525,9 +525,3 @@ curl -X 'POST' \
 "moovier_emb_10_trained_1.h5"
 ```
 
-#### Kedro
-To run only prycaret nodes
-```bash
-kedro run --nodes=pycaret_predict_ratings 
-```
-
