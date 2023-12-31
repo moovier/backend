@@ -10,7 +10,7 @@ To use this application, an [TMDB API](https://www.themoviedb.org/) key is requi
    git clone https://github.com/moovier/backend.git     # clone back-end
    git clone https://github.com/moovier/frontend.git    # clone front-end
   
-   python -m venv moovier                               # create moovier venv
+   python3 -m venv moovier                               # create moovier venv
    source moovier/bin/activate                          # activate moovier
 
    export TMDB_API_KEY=secret-key                       # set-up tmdb key
@@ -24,8 +24,13 @@ To use this application, an [TMDB API](https://www.themoviedb.org/) key is requi
 
 ### Usage
 
-The project can be either run as a standalone [Kedro](https://kedro.org/) pipeline using `kedro run` or as
-a back-end API using `uvicorn app:app`. The application exposes the following endpoints:
+The project can be either run as a standalone [Kedro](https://kedro.org/) pipeline using `kedro run --to-outputs "recommended_movies"` or as
+a back-end API using `uvicorn app:app`. 
+To obtain recommendations based on a model hyper-tuned by [Optuna](https://optuna.org/) run `kedro run --to-outputs "optuna_recommended_movies"`. 
+To obtain recommendations based on a model created by [PyCaret](https://pycaret.org/) run `kedro run --to-outputs "pycaret_model","pycaret_rating_predictions","pycaret_model_metrics"`. 
+The application exposes the following endpoints:
+
+#### API
 
  - `/models` serves the names of pre-trained models that can be used for inference or fine-tuning.
 
@@ -518,5 +523,11 @@ curl -X 'POST' \
 
 ```json
 "moovier_emb_10_trained_1.h5"
+```
+
+#### Kedro
+To run only prycaret nodes
+```bash
+kedro run --nodes=pycaret_predict_ratings 
 ```
 
